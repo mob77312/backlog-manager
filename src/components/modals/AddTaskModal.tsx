@@ -39,7 +39,7 @@ export function AddTaskModal({ open, onClose, defaultStatus, defaultProjectId, d
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Tambah Tugas Baru" description="Task baru — kalau dibuat dengan stage L0 dan project default, project baru akan otomatis dibuat di Board Utama." size="xl">
+    <Modal open={open} onClose={onClose} title="Tambah Proyek Baru" description="Proyek baru lahir di Backlog divisi. Akan otomatis muncul di Board Utama saat dipindah ke kolom Selesai." size="xl">
       <TaskForm
         initial={{
           defaultStatus,
@@ -50,21 +50,17 @@ export function AddTaskModal({ open, onClose, defaultStatus, defaultProjectId, d
         }}
         lockTeam={user?.role !== 'super_admin' && !!user?.teamId}
         onCancel={onClose}
-        submitLabel="Buat Tugas"
+        submitLabel="Buat Proyek"
         onSubmit={(data) => {
           if (!user) {
             toast.error('Session expired — silakan login ulang')
             return
           }
           let finalProjectId = data.projectId
-          // Auto-spawn project SETIAP KALI task dibuat dari Board Divisi context (defaultStage passed eksplisit)
-          // DAN projectId masih default internal. Berlaku untuk SEMUA stage termasuk build_to_operate.
-          const isFromBoardDivisiContext = !!defaultStage
-          if (
-            data.projectId === INTERNAL_PROJECT_ID &&
-            data.stage &&
-            isFromBoardDivisiContext
-          ) {
+          // Auto-spawn project SETIAP KALI projectId masih INTERNAL & stage diset.
+          // Tombol "Tambah Proyek" semantik: setiap klik = bikin proyek baru.
+          // Kalau user mau attach task ke proyek existing, ganti dropdown Project di form.
+          if (data.projectId === INTERNAL_PROJECT_ID && data.stage) {
             const stageStr = data.stage
             const codeSeq = Date.now().toString().slice(-5)
             const newProject = createProject({
@@ -83,11 +79,13 @@ export function AddTaskModal({ open, onClose, defaultStatus, defaultProjectId, d
               createdByName: user.name,
             })
             finalProjectId = newProject.id
+            console.log('[AddTaskModal] Auto-spawned project:', { code: newProject.code, id: newProject.id, currentStage: newProject.currentStage, taskStage: data.stage })
             toast.success(`Project "${newProject.name}" dibuat di ${STAGE_LABELS[data.stage]}`, { duration: 4000 })
           }
           const t = createTask({ ...data, projectId: finalProjectId })
+          console.log('[AddTaskModal] Created task:', { id: t.id, title: t.title, projectId: t.projectId, stage: t.stage, status: t.status, teamId: t.teamId })
           onClose()
-          toast.success('Tugas berhasil dibuat', { icon: '✨' })
+          toast.success('Proyek berhasil dibuat', { icon: '✨' })
           setTimeout(() => openModal({ type: 'detail-task', taskId: t.id }), 50)
         }}
       />

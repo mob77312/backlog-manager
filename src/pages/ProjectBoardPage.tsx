@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
-import { Briefcase, ArrowRight, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Briefcase, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useProjectStore } from '../store/useProjectStore'
 import { useTaskStore } from '../store/useTaskStore'
@@ -29,6 +29,37 @@ export function ProjectBoardPage() {
   const openModal = useUIStore((s) => s.openModal)
   const { user, can } = usePermissions()
 
+  // Visible di Board Utama = project yang punya ≥1 task masuk kolom Selesai
+  // (project di-render di kolom L0 sesuai project.currentStage)
+  const visibleProjects = useMemo(() => {
+    const isTaskDone = (task: typeof tasks[number]) => {
+      const team = teams.find((t) => t.id === task.teamId)
+      const col = team?.kanbanConfig?.find((c) => c.key === task.status)
+      return col?.isDone === true || task.status === 'done'
+    }
+    const filtered = projects.filter((p) => {
+      if (p.status === 'closed' || p.status === 'cancelled') return false
+      return tasks.some((t) => t.projectId === p.id && isTaskDone(t))
+    })
+    // DEBUG: bantu trace kenapa project tidak muncul
+    console.log('[BoardUtama Filter]', {
+      totalProjects: projects.length,
+      totalTasks: tasks.length,
+      doneTasks: tasks.filter(isTaskDone).map((t) => ({ id: t.id, title: t.title, status: t.status, stage: t.stage, projectId: t.projectId, teamId: t.teamId })),
+      visibleCount: filtered.length,
+      hidden: projects.filter((p) => !filtered.includes(p)).map((p) => ({
+        id: p.id,
+        code: p.code,
+        name: p.name,
+        currentStage: p.currentStage,
+        status: p.status,
+        hasAnyTask: tasks.some((t) => t.projectId === p.id),
+        hasDoneTask: tasks.some((t) => t.projectId === p.id && isTaskDone(t)),
+      })),
+    })
+    return filtered
+  }, [projects, tasks, teams])
+
   const grouped = useMemo(() => {
     const map: Record<BusinessStage, Project[]> = {
       lead_to_active: [],
@@ -37,9 +68,9 @@ export function ProjectBoardPage() {
       operate_to_assure: [],
       close: [],
     }
-    projects.forEach((p) => map[p.currentStage].push(p))
+    visibleProjects.forEach((p) => map[p.currentStage].push(p))
     return map
-  }, [projects])
+  }, [visibleProjects])
 
   const onDragEnd = (result: DropResult) => {
     if (!result.destination || !user) return
@@ -67,11 +98,9 @@ export function ProjectBoardPage() {
         toast.error(r.error ?? 'Gagal')
         return
       }
-      // Kalau drag ke kolom Close → auto mark project status='closed'
       const destStage = STAGE_KEYS[dstIdx]
       if (destStage === 'close') {
-        useProjectStore.getState().closeProject(project.id, user.id, user.name)
-        toast.success(`Project "${project.name}" ditutup`, { icon: '🏁', duration: 4000 })
+        toast.success(`Project naik ke ${STAGE_LABELS[destStage]}. Klik "Tutup Project" di detail untuk arsipkan.`, { duration: 5000 })
       } else {
         toast.success(`Project naik ke ${STAGE_LABELS[destStage]}`)
       }

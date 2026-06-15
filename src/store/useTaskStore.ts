@@ -38,6 +38,7 @@ interface TaskState {
   addComment: (taskId: string, author: string, content: string) => void
   removeTasksByTeam: (teamId: string) => void
   markDone: (id: string) => void
+  clearAll: () => void
 }
 
 export const useTaskStore = create<TaskState>()(
@@ -233,6 +234,7 @@ export const useTaskStore = create<TaskState>()(
       removeTasksByTeam: (teamId) => {
         set((s) => ({ tasks: s.tasks.filter((t) => t.teamId !== teamId) }))
       },
+      clearAll: () => set({ tasks: [] }),
     }),
     {
       name: 'flowdesk:tasks',

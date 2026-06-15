@@ -40,6 +40,7 @@ interface HandoffState {
   rejectTarget: (requestId: string, byUserId: string, byName: string, reason: string) => void
 
   getByTask: (taskId: string) => HandoffRequest | undefined
+  clearAll: () => void
 }
 
 export const useHandoffStore = create<HandoffState>()(
@@ -244,6 +245,7 @@ export const useHandoffStore = create<HandoffState>()(
         get().requests.find(
           (r) => r.taskId === taskId && (r.status === 'pending_origin' || r.status === 'pending_target'),
         ),
+      clearAll: () => set({ requests: [] }),
     }),
     { name: 'flowdesk:handoff_requests' },
   ),

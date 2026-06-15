@@ -137,13 +137,13 @@ export function Header() {
                 className="px-2 sm:px-4"
               >
                 <Plus size={14} />
-                <span className="hidden sm:inline">Tambah Tugas</span>
+                <span className="hidden sm:inline">Tambah Proyek</span>
               </Button>
             ) : (
               <Tooltip content={createPerm.reason ?? ''}>
                 <Button disabled className="opacity-60 cursor-not-allowed px-2 sm:px-4">
                   <Plus size={14} />
-                  <span className="hidden sm:inline">Tambah Tugas</span>
+                  <span className="hidden sm:inline">Tambah Proyek</span>
                 </Button>
               </Tooltip>
             )

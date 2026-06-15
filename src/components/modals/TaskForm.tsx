@@ -89,7 +89,7 @@ export function TaskForm({ initial, onSubmit, onCancel, submitLabel = 'Simpan', 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!state.title.trim()) {
-      toast.error('Judul tugas wajib diisi')
+      toast.error('Judul proyek wajib diisi')
       return
     }
     if (!state.teamId) {
@@ -102,10 +102,10 @@ export function TaskForm({ initial, onSubmit, onCancel, submitLabel = 'Simpan', 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
       <Input
-        label="Judul Tugas"
+        label="Judul Proyek"
         value={state.title}
         onChange={(e) => update('title', e.target.value)}
-        placeholder="Contoh: Migrasi Database ke PostgreSQL 16"
+        placeholder="Contoh: Pengadaan Radio Trunking PHE"
         required
         autoFocus
       />

@@ -1,8 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
-import { GitBranch, LogOut, Shield, ShieldCheck, ChevronUp, UserCog, Briefcase } from 'lucide-react'
+import { GitBranch, LogOut, Shield, ShieldCheck, ChevronUp, UserCog, Briefcase, Eraser } from 'lucide-react'
 import { useAuthStore } from '../../store/useAuthStore'
 import { useTeamStore } from '../../store/useTeamStore'
 import { useUIStore } from '../../store/useUIStore'
+import { useProjectStore } from '../../store/useProjectStore'
+import { useTaskStore } from '../../store/useTaskStore'
+import { useHandoffStore } from '../../store/useHandoffStore'
+import { useDeleteRequestStore } from '../../store/useDeleteRequestStore'
+import { useSegmentRequestStore } from '../../store/useSegmentRequestStore'
+import { useLogStore } from '../../store/useLogStore'
 import { usePermissions } from '../../hooks/usePermissions'
 import { Avatar } from '../ui/Avatar'
 import { Tooltip } from '../ui/Tooltip'
@@ -40,6 +46,18 @@ export function UserMenu({ collapsed }: Props) {
   const handleLogout = () => {
     logout()
     toast.success('Berhasil keluar')
+  }
+
+  const handleResetDemo = () => {
+    if (!confirm('Reset semua data demo (proyek, task, handoff, log)?\n\nDivisi, role, workflow, user, dan akun login TETAP. Lanjut?')) return
+    useProjectStore.getState().clearAll()
+    useTaskStore.getState().clearAll()
+    useHandoffStore.getState().clearAll()
+    useDeleteRequestStore.getState().clearAll()
+    useSegmentRequestStore.getState().clearAll()
+    useLogStore.getState().clear()
+    toast.success('Data demo direset', { icon: '🧹', duration: 4000 })
+    setOpen(false)
   }
 
   if (collapsed) {
@@ -139,6 +157,12 @@ export function UserMenu({ collapsed }: Props) {
               setOpen(false)
               openModal({ type: 'workflow-config' })
             }}
+          />
+          <MenuItem
+            allowed={canWorkflow}
+            icon={<Eraser size={13} />}
+            label="Reset Data Demo"
+            onClick={handleResetDemo}
           />
 
           <div className="my-1 border-t border-border-subtle" />

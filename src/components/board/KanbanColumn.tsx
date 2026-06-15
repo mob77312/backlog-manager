@@ -24,7 +24,6 @@ export function KanbanColumn({ column, tasks }: KanbanColumnProps) {
   const openModal = useUIStore((s) => s.openModal)
   const projectId = useUIStore((s) => s.filters.projectId)
   const stageCtx = useUIStore((s) => s.boardStageContext)
-  const sidebarTeamId = useUIStore((s) => s.sidebarTeamFilter)
   const { can } = usePermissions()
   const createPerm = can('task.create')
   const hex = column.color
@@ -70,7 +69,7 @@ export function KanbanColumn({ column, tasks }: KanbanColumnProps) {
                 })
               }}
               className="rounded-md p-1 text-ink-tertiary hover:bg-black/[0.06] hover:text-pertamina-red transition cursor-pointer"
-              title="Tambah tugas"
+              title="Tambah Proyek baru"
             >
               <Plus size={13} />
             </span>
@@ -79,7 +78,7 @@ export function KanbanColumn({ column, tasks }: KanbanColumnProps) {
               <span
                 onClick={(e) => {
                   e.stopPropagation()
-                  toast.error(createPerm.reason ?? 'Tidak diizinkan membuat tugas')
+                  toast.error(createPerm.reason ?? 'Tidak diizinkan membuat proyek')
                 }}
                 className="rounded-md p-1 text-ink-tertiary opacity-40 cursor-not-allowed"
               >
@@ -106,10 +105,10 @@ export function KanbanColumn({ column, tasks }: KanbanColumnProps) {
                   ref={provided.innerRef}
                   {...provided.droppableProps}
                   className={classNames(
-                    'p-2.5 transition flex flex-col gap-1.5',
+                    'p-2.5 transition flex flex-col gap-1.5 overflow-y-auto',
                     snapshot.isDraggingOver && 'bg-pertamina-red-50/60',
                   )}
-                  style={{ minHeight: tasks.length === 0 ? '80px' : 'auto' }}
+                  style={{ minHeight: tasks.length === 0 ? '60px' : '180px', maxHeight: '240px' }}
                 >
                   <AnimatePresence>
                     {tasks.map((task, idx) => (
@@ -150,11 +149,11 @@ export function KanbanColumn({ column, tasks }: KanbanColumnProps) {
                         }
                         className="flex h-12 w-full items-center justify-center rounded-lg border border-dashed border-border bg-white text-[11px] text-ink-tertiary hover:text-pertamina-red hover:border-pertamina-red/40 hover:bg-pertamina-red-50 transition"
                       >
-                        <Plus size={14} className="mr-1" /> Tambah tugas
+                        <Plus size={14} className="mr-1" /> Tambah Proyek
                       </button>
                     ) : (
                       <div
-                        onClick={() => toast.error(createPerm.reason ?? 'Tidak diizinkan membuat tugas')}
+                        onClick={() => toast.error(createPerm.reason ?? 'Tidak diizinkan membuat proyek')}
                         className="flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-white text-[11px] text-ink-tertiary cursor-help px-3 text-center"
                         title={createPerm.reason ?? ''}
                       >

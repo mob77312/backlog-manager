@@ -19,6 +19,7 @@ interface DeleteRequestState {
   approve: (requestId: string, byUserId: string, byName: string, note?: string) => void
   reject: (requestId: string, byUserId: string, byName: string, reason: string) => void
   getByTask: (taskId: string) => DeleteRequest | undefined
+  clearAll: () => void
 }
 
 export const useDeleteRequestStore = create<DeleteRequestState>()(
@@ -116,6 +117,7 @@ export const useDeleteRequestStore = create<DeleteRequestState>()(
       },
 
       getByTask: (taskId) => get().requests.find((r) => r.taskId === taskId && r.status === 'pending'),
+      clearAll: () => set({ requests: [] }),
     }),
     { name: 'flowdesk:delete_requests' },
   ),

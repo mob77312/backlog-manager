@@ -49,6 +49,7 @@ interface ProjectState {
   closeProject: (id: string, byUserId: string, byName: string) => void
   setStatus: (id: string, status: ProjectStatus) => void
   deleteProject: (id: string) => void
+  clearAll: () => void
 }
 
 function nextStage(curr: BusinessStage): BusinessStage | null {
@@ -324,6 +325,7 @@ export const useProjectStore = create<ProjectState>()(
       deleteProject: (id) => {
         set((s) => ({ projects: s.projects.filter((p) => p.id !== id) }))
       },
+      clearAll: () => set({ projects: [] }),
     }),
     { name: 'flowdesk:projects' },
   ),

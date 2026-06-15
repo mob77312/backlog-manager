@@ -24,6 +24,7 @@ interface SegmentRequestState {
   approveRequest: (id: string, byUserId: string, byName: string) => { ok: boolean; error?: string }
   rejectRequest: (id: string, byUserId: string, byName: string, reason: string) => void
   getPendingForTeam: (teamId: string) => SegmentChangeRequest[]
+  clearAll: () => void
 }
 
 export const useSegmentRequestStore = create<SegmentRequestState>()(
@@ -147,6 +148,7 @@ export const useSegmentRequestStore = create<SegmentRequestState>()(
 
       getPendingForTeam: (teamId) =>
         get().requests.filter((r) => r.teamId === teamId && r.status === 'pending'),
+      clearAll: () => set({ requests: [] }),
     }),
     { name: 'flowdesk:segment_requests' },
   ),
