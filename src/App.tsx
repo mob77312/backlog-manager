@@ -5,6 +5,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { ProjectBoardPage } from './pages/ProjectBoardPage'
 import { ModalsRoot } from './components/modals/ModalsRoot'
 import { ActivityLogPanel } from './components/log/ActivityLog'
+import { NotificationPanel } from './components/notification/NotificationPanel'
 import { useUIStore } from './store/useUIStore'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { AuthGate } from './components/auth/AuthGate'
@@ -22,6 +23,7 @@ function App() {
         </AppShell>
         <ModalsRoot />
         <ActivityLogPanel />
+        <NotificationPanel />
         <PendingApprovalNotifier />
       </AuthGate>
       <Toaster

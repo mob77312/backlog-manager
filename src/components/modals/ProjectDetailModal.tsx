@@ -15,6 +15,9 @@ import { PriorityBadge } from '../ui/Badge'
 import { ArrowRight, ArrowLeft, CheckCircle2, Edit3, Plus, X, Briefcase } from 'lucide-react'
 import { classNames, formatDateTime, relativeTime } from '../../utils/helpers'
 import { computeProjectProgress, computeStageProgress, isValidWeights, stageOwnerLabels } from '../../utils/progress'
+import { ProjectDashboardCard } from '../dashboard/ProjectDashboardCard'
+import { KickoffPanel } from '../project/KickoffPanel'
+import { RiskRegisterPanel } from '../project/RiskRegisterPanel'
 import { Tooltip } from '../ui/Tooltip'
 import type { BusinessStage, Project } from '../../types'
 import toast from 'react-hot-toast'
@@ -25,7 +28,7 @@ interface Props {
   projectId: string
 }
 
-type Tab = 'overview' | 'weights' | 'tasks' | 'history'
+type Tab = 'overview' | 'scurve' | 'kickoff' | 'risk' | 'completion' | 'weights' | 'tasks' | 'history'
 
 export function ProjectDetailModal({ open, onClose, projectId }: Props) {
   const project = useProjectStore((s) => s.projects.find((p) => p.id === projectId))
@@ -37,8 +40,9 @@ export function ProjectDetailModal({ open, onClose, projectId }: Props) {
   const openModal = useUIStore((s) => s.openModal)
   const advanceStage = useProjectStore((s) => s.advanceStage)
   const sendBackStage = useProjectStore((s) => s.sendBackStage)
-  const closeProject = useProjectStore((s) => s.closeProject)
+  // closeProject (legacy) digantikan oleh project-completion modal
   const setWeights = useProjectStore((s) => s.setWeights)
+  const resubmitForApproval = useProjectStore((s) => s.resubmitForApproval)
   const { user, can } = usePermissions()
   const [tab, setTab] = useState<Tab>('overview')
   const [editWeights, setEditWeights] = useState<Record<BusinessStage, number> | null>(null)
@@ -104,15 +108,41 @@ export function ProjectDetailModal({ open, onClose, projectId }: Props) {
         </div>
       </div>
 
+      {/* I2: Rejection banner + resubmit action */}
+      {project.status === 'rejected' && (
+        <RejectedBanner
+          project={project}
+          canResubmit={user?.id === project.createdByUserId || can('project.create').allowed}
+          onResubmit={(note) => {
+            if (!user) return
+            const r = resubmitForApproval(project.id, user.id, user.name, note)
+            if (!r.ok) toast.error(r.error ?? 'Gagal resubmit')
+            else toast.success('Project di-resubmit untuk approval')
+          }}
+        />
+      )}
+
       {/* Tabs */}
       <div className="border-b border-border-subtle mb-3">
         <div className="flex gap-1">
-          {([
-            ['overview', 'Overview'],
-            ['weights', 'Bobot & Stage'],
-            ['tasks', 'Tasks per Stage'],
-            ['history', 'Riwayat'],
-          ] as Array<[Tab, string]>).map(([k, label]) => (
+          {(
+            [
+              ['overview', 'Overview'],
+              ['scurve', 'S-Curve'],
+              ...(project.priority === 'high' || project.priority === 'critical'
+                ? [['kickoff', 'Kickoff']] as Array<[Tab, string]>
+                : []),
+              ...(project.priority === 'critical'
+                ? [['risk', `Risk (${project.riskRegister.length})`]] as Array<[Tab, string]>
+                : []),
+              ...(project.completion
+                ? [['completion', 'Penyelesaian']] as Array<[Tab, string]>
+                : []),
+              ['weights', 'Bobot & Stage'],
+              ['tasks', 'Tasks per Stage'],
+              ['history', 'Riwayat'],
+            ] as Array<[Tab, string]>
+          ).map(([k, label]) => (
             <button
               key={k}
               onClick={() => setTab(k)}
@@ -194,14 +224,12 @@ export function ProjectDetailModal({ open, onClose, projectId }: Props) {
               <button
                 onClick={() => {
                   if (!user) return
-                  if (confirm('Tutup project ini?')) {
-                    closeProject(project.id, user.id, user.name)
-                    toast.success('Project ditutup')
-                  }
+                  // F5: Tutup project SEKARANG via Form Penyelesaian (BAST wajib).
+                  openModal({ type: 'project-completion', projectId: project.id })
                 }}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-300 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition"
               >
-                <CheckCircle2 size={13} /> Tutup Project
+                <CheckCircle2 size={13} /> Tutup Project (Form Penyelesaian)
               </button>
             ) : closePerm.allowed && project.status !== 'closed' ? (
               <Tooltip content="Project harus di stage Close dulu — advance bertahap stage demi stage">
@@ -215,6 +243,26 @@ export function ProjectDetailModal({ open, onClose, projectId }: Props) {
             ) : null}
           </div>
         </div>
+      )}
+
+      {tab === 'scurve' && (
+        <div className="space-y-3">
+          <ProjectDashboardCard project={project} clickable={false} />
+        </div>
+      )}
+
+      {tab === 'kickoff' && (
+        <KickoffTab project={project} />
+      )}
+
+      {tab === 'risk' && (
+        <div className="space-y-3">
+          <RiskRegisterPanel project={project} />
+        </div>
+      )}
+
+      {tab === 'completion' && project.completion && (
+        <CompletionTab project={project} />
       )}
 
       {tab === 'weights' && (
@@ -480,6 +528,225 @@ function TasksByStageTab({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function KickoffTab({ project }: { project: Project }) {
+  const [editing, setEditing] = useState(false)
+  const k = project.kickoffMeeting
+  if (!k && !editing) {
+    return (
+      <div className="rounded-lg border border-dashed border-border-subtle p-6 text-center">
+        <div className="text-[12px] text-ink-secondary mb-2">
+          Kickoff Meeting belum dicatat.
+        </div>
+        <button onClick={() => setEditing(true)} className="btn-primary text-[11px]">
+          Catat Kickoff Meeting
+        </button>
+      </div>
+    )
+  }
+  if (editing) {
+    return (
+      <KickoffPanel
+        project={project}
+        onApproved={() => setEditing(false)}
+        onCancel={() => setEditing(false)}
+      />
+    )
+  }
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-[11px] text-ink-tertiary">
+          Direkam oleh <strong className="text-ink-primary">{k!.recordedByName}</strong>
+          {' · '}
+          {new Date(k!.recordedAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+        </div>
+        <button
+          onClick={() => setEditing(true)}
+          className="rounded-md border border-border bg-white px-2 py-1 text-[11px] font-medium text-ink-secondary hover:text-pertamina-red hover:border-pertamina-red/40 transition"
+        >
+          Edit
+        </button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <KField label="Tanggal Meeting">
+          {new Date(k!.meetingDate).toLocaleDateString('id-ID', { dateStyle: 'full' })}
+        </KField>
+        <KField label="Lokasi / Link">{k!.location || '—'}</KField>
+      </div>
+      <KField label={`Attendees (${k!.attendees.length})`}>
+        <div className="flex flex-wrap gap-1">
+          {k!.attendees.map((a) => (
+            <span key={a} className="pill border border-blue-200 bg-blue-50 text-blue-700">{a}</span>
+          ))}
+        </div>
+      </KField>
+      <KField label="Agenda">
+        <pre className="whitespace-pre-wrap font-sans text-[12px] text-ink-primary">{k!.agenda || '—'}</pre>
+      </KField>
+      <KField label="Keputusan Utama">
+        <pre className="whitespace-pre-wrap font-sans text-[12px] text-ink-primary">{k!.decisions || '—'}</pre>
+      </KField>
+      <KField label="Action Items">
+        <pre className="whitespace-pre-wrap font-sans text-[12px] text-ink-primary">{k!.actionItems || '—'}</pre>
+      </KField>
+      <KField label="Catatan / Notulen">
+        <pre className="whitespace-pre-wrap font-sans text-[12px] text-ink-primary">{k!.notes || '—'}</pre>
+      </KField>
+    </div>
+  )
+}
+
+function CompletionTab({ project }: { project: Project }) {
+  const c = project.completion!
+  const outcomeColor = c.outcome === 'successful' ? '#059669' : c.outcome === 'partial' ? '#d97706' : '#ef4444'
+  const outcomeLabel = c.outcome === 'successful' ? 'Successful' : c.outcome === 'partial' ? 'Partial' : 'Cancelled'
+  const downloadEvidence = (e: typeof c.evidence[number]) => {
+    const link = document.createElement('a')
+    link.href = e.dataUrl
+    link.download = e.name
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+  const formatBytes = (b: number) => {
+    if (b < 1024) return `${b} B`
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`
+    return `${(b / 1024 / 1024).toFixed(2)} MB`
+  }
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border-2 px-3 py-2.5 flex items-center justify-between" style={{ borderColor: outcomeColor, background: `${outcomeColor}10` }}>
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-ink-tertiary">Outcome</div>
+          <div className="text-[15px] font-bold" style={{ color: outcomeColor }}>{outcomeLabel}</div>
+        </div>
+        <div className="text-right text-[11px] text-ink-tertiary">
+          Ditutup oleh <strong className="text-ink-primary">{c.closedByName}</strong><br />
+          {new Date(c.closedAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+        </div>
+      </div>
+      <KField label="Tanggal Penyelesaian">
+        {new Date(c.completionDate).toLocaleDateString('id-ID', { dateStyle: 'full' })}
+      </KField>
+      <KField label="Ringkasan Deliverable">
+        <pre className="whitespace-pre-wrap font-sans text-[12px] text-ink-primary">{c.deliverableSummary || '—'}</pre>
+      </KField>
+      <KField label={`Evidence / BAST (${c.evidence.length})`}>
+        <div className="space-y-1">
+          {c.evidence.map((e) => (
+            <div key={e.id} className="flex items-center gap-2 rounded-md border border-border-subtle bg-white px-2 py-1.5 text-[11px]">
+              <span className="flex-1 truncate text-ink-primary">{e.name}</span>
+              <span className="text-[10px] text-ink-tertiary">{formatBytes(e.size)}</span>
+              <button
+                onClick={() => downloadEvidence(e)}
+                className="text-[10px] text-pertamina-red underline hover:no-underline"
+              >
+                Download
+              </button>
+            </div>
+          ))}
+        </div>
+      </KField>
+      <KField label="Lessons Learned">
+        <pre className="whitespace-pre-wrap font-sans text-[12px] text-ink-primary">{c.lessonsLearned || '—'}</pre>
+      </KField>
+      <KField label="Stakeholder Feedback">
+        <pre className="whitespace-pre-wrap font-sans text-[12px] text-ink-primary">{c.stakeholderFeedback || '—'}</pre>
+      </KField>
+    </div>
+  )
+}
+
+function KField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-border-subtle bg-bg-column/40 px-3 py-2">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-tertiary mb-1">{label}</div>
+      <div className="text-[12px] text-ink-primary">{children}</div>
+    </div>
+  )
+}
+
+function RejectedBanner({
+  project,
+  canResubmit,
+  onResubmit,
+}: {
+  project: Project
+  canResubmit: boolean
+  onResubmit: (note: string) => void
+}) {
+  const [showForm, setShowForm] = useState(false)
+  const [note, setNote] = useState('')
+  const rejectedStep = project.approvalFlow.find((s) => s.status === 'rejected')
+  return (
+    <div className="mb-3 rounded-lg border border-pertamina-red/40 bg-pertamina-red-50/60 px-3 py-2.5">
+      <div className="flex items-start gap-2">
+        <X size={16} className="text-pertamina-red mt-0.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="text-[12px] font-semibold text-pertamina-red">
+            Project DITOLAK pada step "{rejectedStep?.label ?? '—'}"
+          </div>
+          {rejectedStep?.rejectedReason && (
+            <div className="mt-0.5 text-[11px] text-ink-secondary">
+              <strong>Alasan:</strong> {rejectedStep.rejectedReason}
+            </div>
+          )}
+          {rejectedStep?.approvedByName && (
+            <div className="text-[10px] text-ink-tertiary">oleh {rejectedStep.approvedByName}</div>
+          )}
+        </div>
+        {canResubmit && !showForm && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="shrink-0 rounded-md border border-pertamina-red bg-white px-2 py-1 text-[11px] font-medium text-pertamina-red hover:bg-pertamina-red-50 transition"
+          >
+            Ajukan Ulang
+          </button>
+        )}
+      </div>
+      {showForm && (
+        <div className="mt-2 space-y-2 rounded-md border border-pertamina-red/30 bg-white p-2.5">
+          <span className="block text-[11px] font-medium text-ink-secondary">
+            Catatan Revisi (wajib)
+          </span>
+          <textarea
+            className="input-base min-h-[60px] text-[12px]"
+            placeholder="Jelaskan revisi/perbaikan yang sudah dilakukan sebelum resubmit..."
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+          <div className="flex items-center justify-end gap-1.5">
+            <button
+              onClick={() => {
+                setShowForm(false)
+                setNote('')
+              }}
+              className="btn-ghost text-[11px] py-1"
+            >
+              Batal
+            </button>
+            <button
+              onClick={() => {
+                if (!note.trim()) {
+                  toast.error('Catatan revisi wajib diisi')
+                  return
+                }
+                onResubmit(note)
+                setShowForm(false)
+                setNote('')
+              }}
+              disabled={!note.trim()}
+              className={classNames('btn-primary text-[11px] py-1', !note.trim() && 'opacity-50 cursor-not-allowed')}
+            >
+              Resubmit untuk Approval
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

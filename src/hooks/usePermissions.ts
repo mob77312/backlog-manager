@@ -223,6 +223,22 @@ function evaluate(
       if (!p.canApproveSegmentChange) return denied(`${role.name} tidak dapat menyetujui perubahan kolom`)
       return allowed()
 
+    case 'project.approveAsOSM':
+      if (!p.canApproveAsOSM) return denied(`${role.name} bukan OSM Approver`)
+      return allowed()
+
+    case 'project.approveAsDMO':
+      if (!p.canApproveAsDMO) return denied(`${role.name} bukan DMO Approver`)
+      return allowed()
+
+    case 'project.approveAsKadiv': {
+      if (!p.canApproveAsKadiv) return denied(`${role.name} bukan Kadiv Approver`)
+      // Kadiv selalu scoped — harus divisi yang sama dengan creator project.
+      if ((ownDivisionOnly || ownDepartmentOnly) && ctx?.teamId && !inOwnDivision)
+        return denied('Hanya bisa approve project di divisi Anda sendiri')
+      return allowed()
+    }
+
     default:
       return denied('Tidak diizinkan')
   }

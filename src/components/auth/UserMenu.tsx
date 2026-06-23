@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { GitBranch, LogOut, Shield, ShieldCheck, ChevronUp, UserCog, Briefcase, Eraser } from 'lucide-react'
+import { GitBranch, LogOut, Shield, ShieldCheck, ChevronUp, UserCog, Briefcase, Eraser, ListChecks } from 'lucide-react'
 import { useAuthStore } from '../../store/useAuthStore'
 import { useTeamStore } from '../../store/useTeamStore'
 import { useUIStore } from '../../store/useUIStore'
@@ -49,14 +49,14 @@ export function UserMenu({ collapsed }: Props) {
   }
 
   const handleResetDemo = () => {
-    if (!confirm('Reset semua data demo (proyek, task, handoff, log)?\n\nDivisi, role, workflow, user, dan akun login TETAP. Lanjut?')) return
-    useProjectStore.getState().clearAll()
-    useTaskStore.getState().clearAll()
+    if (!confirm('Reset semua data demo (proyek + task ke seed, handoff/log dikosongkan)?\n\nDivisi, role, workflow, user, dan akun login TETAP. Lanjut?')) return
+    useProjectStore.getState().resetToSeed()
+    useTaskStore.getState().resetToSeed()
     useHandoffStore.getState().clearAll()
     useDeleteRequestStore.getState().clearAll()
     useSegmentRequestStore.getState().clearAll()
     useLogStore.getState().clear()
-    toast.success('Data demo direset', { icon: '🧹', duration: 4000 })
+    toast.success('Data demo dimuat ulang dari seed', { icon: '🧹', duration: 4000 })
     setOpen(false)
   }
 
@@ -156,6 +156,15 @@ export function UserMenu({ collapsed }: Props) {
             onClick={() => {
               setOpen(false)
               openModal({ type: 'workflow-config' })
+            }}
+          />
+          <MenuItem
+            allowed={canWorkflow}
+            icon={<ListChecks size={13} />}
+            label="Template Approval Project"
+            onClick={() => {
+              setOpen(false)
+              openModal({ type: 'approval-templates' })
             }}
           />
           <MenuItem

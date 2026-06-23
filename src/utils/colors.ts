@@ -1,4 +1,4 @@
-import type { Priority, Status, ActivityType, BusinessStage } from '../types'
+import type { Priority, Status, ActivityType, BusinessStage, ApprovalStepType, ApprovalStepStatus, ProjectStatus, AttachmentCategory, RiskLevel, RiskSeverity, RiskStatus } from '../types'
 
 export const PRIORITY_COLORS: Record<Priority, { bg: string; text: string; border: string; ring?: string }> = {
   critical: { bg: 'bg-priority-critical', text: 'text-white', border: 'border-priority-critical', ring: 'shadow-glow-danger' },
@@ -185,6 +185,140 @@ export const ACTIVITY_TYPE_META: Record<ActivityType, { color: string; icon: str
   segment_change_requested: { color: 'text-amber-700', icon: 'inbox' },
   segment_change_approved: { color: 'text-emerald-700', icon: 'check' },
   segment_change_rejected: { color: 'text-pertamina-red', icon: 'x' },
+  project_submitted_for_approval: { color: 'text-amber-700', icon: 'inbox' },
+  project_approval_step_approved: { color: 'text-emerald-700', icon: 'check' },
+  project_approval_step_rejected: { color: 'text-pertamina-red', icon: 'x' },
+  project_activated: { color: 'text-emerald-700', icon: 'check' },
+  project_approval_rejected: { color: 'text-pertamina-red', icon: 'x' },
+  task_attachment_added: { color: 'text-blue-700', icon: 'paperclip' },
+  task_attachment_removed: { color: 'text-pertamina-red', icon: 'paperclip' },
+  task_attachment_version_added: { color: 'text-violet-700', icon: 'paperclip' },
+  project_kickoff_recorded: { color: 'text-blue-700', icon: 'flag' },
+  project_risk_added: { color: 'text-pertamina-red', icon: 'alert' },
+  project_risk_updated: { color: 'text-amber-700', icon: 'alert' },
+  project_risk_removed: { color: 'text-slate-600', icon: 'alert' },
+  project_completion_recorded: { color: 'text-emerald-700', icon: 'check' },
 }
 
 export const FIBONACCI_POINTS = [1, 2, 3, 5, 8, 13]
+
+/* ============================================================
+ *  PROJECT APPROVAL FLOW — Labels & Colors
+ * ============================================================ */
+
+export const APPROVAL_STEP_LABELS: Record<ApprovalStepType, string> = {
+  creator_submit: 'Submit oleh Creator',
+  kadiv_approval: 'Persetujuan Kadiv',
+  kickoff_meeting: 'Kickoff Meeting',
+  risk_assessment: 'Risk Assessment',
+  osm_approval: 'OSM Approval',
+  dmo_approval: 'DMO Approval',
+}
+
+export const APPROVAL_STEP_STATUS_LABELS: Record<ApprovalStepStatus, string> = {
+  pending: 'Menunggu',
+  in_review: 'Sedang Review',
+  approved: 'Disetujui',
+  rejected: 'Ditolak',
+  skipped: 'Dilewati',
+}
+
+export const APPROVAL_STEP_STATUS_COLORS: Record<ApprovalStepStatus, string> = {
+  pending: '#94a3b8',
+  in_review: '#d97706',
+  approved: '#059669',
+  rejected: '#ef4444',
+  skipped: '#cbd5e1',
+}
+
+export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
+  draft: 'Draft',
+  pending_approval: 'Menunggu Approval',
+  active: 'Aktif',
+  on_hold: 'On Hold',
+  completed: 'Selesai',
+  closed: 'Closed',
+  cancelled: 'Dibatalkan',
+  rejected: 'Ditolak',
+}
+
+export const PROJECT_STATUS_COLORS: Record<ProjectStatus, string> = {
+  draft: '#94a3b8',
+  pending_approval: '#d97706',
+  active: '#059669',
+  on_hold: '#475569',
+  completed: '#059669',
+  closed: '#0891b2',
+  cancelled: '#64748b',
+  rejected: '#ef4444',
+}
+
+/* ============================================================
+ *  TASK ATTACHMENTS (P2)
+ * ============================================================ */
+
+export const ATTACHMENT_CATEGORY_LABELS: Record<AttachmentCategory, string> = {
+  reference: 'Reference',
+  execution: 'Execution',
+  evidence: 'Evidence',
+  result: 'Result',
+}
+
+export const ATTACHMENT_CATEGORY_DESCRIPTIONS: Record<AttachmentCategory, string> = {
+  reference: 'Dokumen acuan: BOQ, RAB, kontrak draft, spek teknis, surat penugasan.',
+  execution: 'File kerja: desain, draft BAST, working document, source design.',
+  evidence: 'Bukti pelaksanaan: foto sitevisit, video instalasi, screenshot progress.',
+  result: 'Output final: BAST final, dokumen hand-over, laporan closing.',
+}
+
+export const ATTACHMENT_CATEGORY_COLORS: Record<AttachmentCategory, { hex: string; bg: string; text: string; border: string }> = {
+  reference: { hex: '#2563eb', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+  execution: { hex: '#d97706', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+  evidence: { hex: '#7c3aed', bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200' },
+  result: { hex: '#059669', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+}
+
+export const ATTACHMENT_CATEGORY_KEYS: AttachmentCategory[] = ['reference', 'execution', 'evidence', 'result']
+
+/** Limit per file (20 MB) — sesuai keputusan user. */
+export const ATTACHMENT_MAX_FILE_BYTES = 20 * 1024 * 1024
+/** Limit total file per project (50). */
+export const ATTACHMENT_MAX_FILES_PER_PROJECT = 50
+
+/* ============================================================
+ *  RISK REGISTER (P5)
+ * ============================================================ */
+
+export const RISK_LEVEL_LABELS: Record<RiskLevel, string> = {
+  low: 'Rendah',
+  medium: 'Sedang',
+  high: 'Tinggi',
+}
+
+export const RISK_SEVERITY_LABELS: Record<RiskSeverity, string> = {
+  low: 'Rendah',
+  medium: 'Sedang',
+  high: 'Tinggi',
+  extreme: 'Ekstrem',
+}
+
+export const RISK_SEVERITY_HEX: Record<RiskSeverity, string> = {
+  low: '#059669',
+  medium: '#d97706',
+  high: '#ea580c',
+  extreme: '#E31E24',
+}
+
+export const RISK_STATUS_LABELS: Record<RiskStatus, string> = {
+  open: 'Terbuka',
+  mitigated: 'Termitigasi',
+  accepted: 'Diterima',
+  closed: 'Ditutup',
+}
+
+export const RISK_STATUS_HEX: Record<RiskStatus, string> = {
+  open: '#E31E24',
+  mitigated: '#d97706',
+  accepted: '#0891b2',
+  closed: '#64748b',
+}

@@ -44,6 +44,19 @@ export type ActivityType =
   | 'segment_change_requested'
   | 'segment_change_approved'
   | 'segment_change_rejected'
+  | 'project_submitted_for_approval'
+  | 'project_approval_step_approved'
+  | 'project_approval_step_rejected'
+  | 'project_activated'
+  | 'project_approval_rejected'
+  | 'task_attachment_added'
+  | 'task_attachment_removed'
+  | 'task_attachment_version_added'
+  | 'project_kickoff_recorded'
+  | 'project_risk_added'
+  | 'project_risk_updated'
+  | 'project_risk_removed'
+  | 'project_completion_recorded'
 
 export type Role = string
 
@@ -83,6 +96,11 @@ export interface RolePermissions {
   // Kanban segment config per-divisi
   canRequestSegmentChange: boolean
   canApproveSegmentChange: boolean
+  // Project approval roles (P1 redesign)
+  canApproveAsOSM: boolean
+  canApproveAsDMO: boolean
+  // F2: Kadiv approval khusus untuk project (divisi-scoped, sebelum OSM/DMO)
+  canApproveAsKadiv: boolean
 }
 
 export interface MasterRole {
@@ -157,6 +175,9 @@ export type PermissionAction =
   | 'project.close'
   | 'segment.request'
   | 'segment.approve'
+  | 'project.approveAsOSM'
+  | 'project.approveAsDMO'
+  | 'project.approveAsKadiv'
 
 export interface PermissionContext {
   teamId?: string | null
@@ -196,6 +217,31 @@ export interface HandoffRecord {
   by: string
 }
 
+/* ============================================================
+ *  TASK ATTACHMENTS (P2)
+ * ============================================================ */
+
+export type AttachmentCategory = 'reference' | 'execution' | 'evidence' | 'result'
+
+export interface TaskAttachment {
+  id: string
+  category: AttachmentCategory
+  name: string
+  description: string
+  /** Semver-like string: v1.0, v1.1, v2.0, ... */
+  version: string
+  /** ID attachment versi sebelumnya (null = versi pertama dari root). */
+  versionOfId: string | null
+  /** Size in bytes (untuk validasi 20MB/file). */
+  size: number
+  mimeType: string
+  /** Base64 data URL — disimpan inline karena tidak ada backend. */
+  dataUrl: string
+  uploadedByUserId: string
+  uploadedByName: string
+  uploadedAt: string
+}
+
 export interface Task {
   id: string
   title: string
@@ -203,15 +249,27 @@ export interface Task {
   priority: Priority
   status: Status
   teamId: string
+  /** Primary PIC (assignee). */
   assignees: string[]
+  /** P2: Co-PIC (pendukung utama PIC). */
+  coPics: string[]
   tags: string[]
   deadline: string | null
   createdAt: string
   updatedAt: string
   storyPoints: number
+  /** P2: Estimasi durasi dalam hari kerja. Null = belum di-set. */
+  estimatedDurationDays: number | null
+  /** P2: Apakah task ini milestone penting (akan ditampilkan di S-Curve). */
+  isMilestone: boolean
+  /** P2: Deliverable utama yang diharapkan dari task ini. */
+  deliverable: string
   completedAt: string | null
   handoffHistory: HandoffRecord[]
+  /** @deprecated dihitung dari attachments.length */
   attachmentCount: number
+  /** P2: Attachment multi-kategori dengan versioning. */
+  attachments: TaskAttachment[]
   commentCount: number
   parentTaskId: string | null
   subTasks: SubTask[]
@@ -414,7 +472,134 @@ export interface ProjectStageTransition {
   timestamp: string
 }
 
-export type ProjectStatus = 'active' | 'on_hold' | 'closed' | 'cancelled'
+export type ProjectStatus =
+  | 'draft'
+  | 'pending_approval'
+  | 'active'
+  | 'on_hold'
+  | 'completed'
+  | 'closed'
+  | 'cancelled'
+  | 'rejected'
+
+/* ============================================================
+ *  PROJECT APPROVAL FLOW (Priority-driven)
+ *  P1 Scope: Low/Medium fully wired. High/Critical stub kickoff/risk steps
+ *  yang akan diisi penuh di P4 (Kickoff) & P5 (Risk Assessment).
+ * ============================================================ */
+
+export type ApprovalStepType =
+  | 'creator_submit'
+  | 'kadiv_approval'      // Kadiv divisi creator (F2 — internal validation dulu)
+  | 'kickoff_meeting'     // HIGH + CRITICAL (P4)
+  | 'risk_assessment'     // CRITICAL only (P5)
+  | 'osm_approval'
+  | 'dmo_approval'
+
+export type ApprovalStepStatus = 'pending' | 'in_review' | 'approved' | 'rejected' | 'skipped'
+
+export type ApproverRole = 'project_owner' | 'kadiv_approver' | 'osm_approver' | 'dmo_approver' | 'system'
+
+export interface ApprovalStep {
+  id: string
+  order: number
+  type: ApprovalStepType
+  label: string
+  status: ApprovalStepStatus
+  requiredRole: ApproverRole
+  /** Komentar wajib (MEDIUM/HIGH/CRITICAL pada OSM/DMO step). */
+  requireComment: boolean
+  /** Risk acknowledgement checkbox (CRITICAL pada OSM/DMO step). */
+  requireRiskAck: boolean
+  /** Approval data */
+  approvedByUserId: string | null
+  approvedByName: string | null
+  approvedAt: string | null
+  comment: string | null
+  riskAcknowledged: boolean
+  /** Untuk LOW: checklist "Saya telah mengetahui project ini" */
+  acknowledgedChecklist: boolean
+  rejectedReason: string | null
+}
+
+/* ============================================================
+ *  KICKOFF MEETING (P4) — HIGH + CRITICAL priority
+ * ============================================================ */
+
+export interface KickoffMeeting {
+  /** Tanggal pelaksanaan kickoff. */
+  meetingDate: string
+  /** Lokasi (fisik atau link virtual). */
+  location: string
+  /** Daftar attendee (nama, opsional role). */
+  attendees: string[]
+  /** Agenda diskusi (bullet point per baris). */
+  agenda: string
+  /** Keputusan utama yang diambil. */
+  decisions: string
+  /** Catatan tambahan / notulen. */
+  notes: string
+  /** Action items hasil kickoff. */
+  actionItems: string
+  recordedByUserId: string
+  recordedByName: string
+  recordedAt: string
+}
+
+/* ============================================================
+ *  PROJECT COMPLETION FORM (F4) — wajib saat tutup project
+ * ============================================================ */
+
+export type CompletionOutcome = 'successful' | 'partial' | 'cancelled'
+
+export interface CompletionAttachment {
+  id: string
+  name: string
+  size: number
+  mimeType: string
+  dataUrl: string
+}
+
+export interface ProjectCompletion {
+  outcome: CompletionOutcome
+  /** Tanggal aktual penyelesaian. */
+  completionDate: string
+  /** Ringkasan deliverable yang diserahkan. */
+  deliverableSummary: string
+  /** Lessons learned untuk knowledge base. */
+  lessonsLearned: string
+  /** Stakeholder satisfaction note. */
+  stakeholderFeedback: string
+  /** Minimal 1 evidence wajib (BAST, foto serah terima, dll). */
+  evidence: CompletionAttachment[]
+  closedByUserId: string
+  closedByName: string
+  closedAt: string
+}
+
+/* ============================================================
+ *  RISK REGISTER (P5) — CRITICAL priority
+ * ============================================================ */
+
+export type RiskLevel = 'low' | 'medium' | 'high'
+export type RiskSeverity = 'low' | 'medium' | 'high' | 'extreme'
+export type RiskStatus = 'open' | 'mitigated' | 'accepted' | 'closed'
+
+export interface RiskItem {
+  id: string
+  /** Kode singkat: R001, R002, dst. */
+  code: string
+  description: string
+  probability: RiskLevel
+  impact: RiskLevel
+  /** Severity = derived dari probability × impact (auto). */
+  severity: RiskSeverity
+  mitigationPlan: string
+  riskOwner: string
+  status: RiskStatus
+  createdAt: string
+  updatedAt: string
+}
 
 export interface Project {
   id: string
@@ -429,9 +614,25 @@ export interface Project {
   stageConfig: ProjectStageConfig[]
   stageHistory: ProjectStageTransition[]
   tags: string[]
+  /** Planned dates dari form Create Project (untuk baseline S-Curve). */
+  plannedStartDate: string | null
+  plannedEndDate: string | null
+  /** Actual dates (di-track otomatis dari aktivitas project). */
+  actualStartDate: string | null
+  actualEndDate: string | null
+  /** @deprecated pakai plannedStartDate */
   startDate: string | null
+  /** @deprecated pakai plannedEndDate */
   targetCloseDate: string | null
   actualCloseDate: string | null
+  /** Approval flow steps — generated saat createProject berdasarkan priority */
+  approvalFlow: ApprovalStep[]
+  /** P4: Kickoff meeting data (HIGH + CRITICAL). Null = belum direkam. */
+  kickoffMeeting: KickoffMeeting | null
+  /** P5: Risk register (CRITICAL). Kosong = belum ada item. */
+  riskRegister: RiskItem[]
+  /** F4: Form penyelesaian project (wajib saat close). Null = belum diselesaikan. */
+  completion: ProjectCompletion | null
   createdByUserId: string
   createdByName: string
   createdAt: string

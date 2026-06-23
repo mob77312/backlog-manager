@@ -8,8 +8,9 @@ import { FIBONACCI_POINTS, PRIORITY_LABELS, STAGE_KEYS, STAGE_LABELS } from '../
 import { defaultKanbanConfig, sortedColumns } from '../../utils/kanbanDefaults'
 import { INTERNAL_PROJECT_ID } from '../../utils/constants'
 import { TagPill } from '../ui/Badge'
-import { X } from 'lucide-react'
+import { Flag, X } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { classNames } from '../../utils/helpers'
 
 export interface TaskFormState {
   title: string
@@ -19,9 +20,13 @@ export interface TaskFormState {
   teamId: string
   departmentId: string | null
   assignees: string[]
+  coPics: string[]
   tags: string[]
   deadline: string | null
   storyPoints: number
+  estimatedDurationDays: number | null
+  isMilestone: boolean
+  deliverable: string
   projectId: string | null
   stage: BusinessStage | null
 }
@@ -61,13 +66,18 @@ export function TaskForm({ initial, onSubmit, onCancel, submitLabel = 'Simpan', 
     teamId: initial.teamId ?? teams[0]?.id ?? '',
     departmentId: initial.departmentId ?? null,
     assignees: initial.assignees ?? [],
+    coPics: initial.coPics ?? [],
     tags: initial.tags ?? [],
     deadline: initial.deadline ?? null,
     storyPoints: initial.storyPoints ?? 3,
+    estimatedDurationDays: initial.estimatedDurationDays ?? null,
+    isMilestone: initial.isMilestone ?? false,
+    deliverable: initial.deliverable ?? '',
     projectId: smartDefaultProjectId,
     stage: effectiveStage,
   })
   const [assigneeInput, setAssigneeInput] = useState('')
+  const [coPicInput, setCoPicInput] = useState('')
   const [tagInput, setTagInput] = useState('')
 
   const update = <K extends keyof TaskFormState>(k: K, v: TaskFormState[K]) =>
@@ -89,7 +99,7 @@ export function TaskForm({ initial, onSubmit, onCancel, submitLabel = 'Simpan', 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!state.title.trim()) {
-      toast.error('Judul proyek wajib diisi')
+      toast.error('Judul tugas wajib diisi')
       return
     }
     if (!state.teamId) {
@@ -102,10 +112,10 @@ export function TaskForm({ initial, onSubmit, onCancel, submitLabel = 'Simpan', 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
       <Input
-        label="Judul Proyek"
+        label="Judul Tugas *"
         value={state.title}
         onChange={(e) => update('title', e.target.value)}
-        placeholder="Contoh: Pengadaan Radio Trunking PHE"
+        placeholder="Contoh: Survey lokasi tower PHE Site-12"
         required
         autoFocus
       />
@@ -114,7 +124,15 @@ export function TaskForm({ initial, onSubmit, onCancel, submitLabel = 'Simpan', 
         label="Deskripsi"
         value={state.description}
         onChange={(e) => update('description', e.target.value)}
-        placeholder="Detail tugas, konteks, dan kriteria selesai..."
+        placeholder="Konteks tugas, batasan, prasyarat, kriteria selesai..."
+      />
+
+      <Textarea
+        label="Deliverable"
+        value={state.deliverable}
+        onChange={(e) => update('deliverable', e.target.value)}
+        placeholder="Output konkret yang diharapkan dari tugas ini — mis. Berita Acara Survey, file desain HLD, dll."
+        rows={2}
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -207,12 +225,22 @@ export function TaskForm({ initial, onSubmit, onCancel, submitLabel = 'Simpan', 
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Select
           label="Story Points"
           value={String(state.storyPoints)}
           onChange={(e) => update('storyPoints', parseInt(e.target.value, 10))}
           options={FIBONACCI_POINTS.map((p) => ({ value: String(p), label: `${p} poin` }))}
+        />
+        <Input
+          label="Estimasi Durasi (hari)"
+          type="number"
+          min={0}
+          value={state.estimatedDurationDays ?? ''}
+          onChange={(e) =>
+            update('estimatedDurationDays', e.target.value ? Math.max(0, parseInt(e.target.value, 10)) : null)
+          }
+          placeholder="mis. 5"
         />
         <Input
           label="Deadline"
@@ -222,8 +250,33 @@ export function TaskForm({ initial, onSubmit, onCancel, submitLabel = 'Simpan', 
         />
       </div>
 
+      <label
+        className={classNames(
+          'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition',
+          state.isMilestone
+            ? 'border-amber-400 bg-amber-50/60'
+            : 'border-border bg-white hover:bg-black/[0.03]',
+        )}
+      >
+        <input
+          type="checkbox"
+          checked={state.isMilestone}
+          onChange={(e) => update('isMilestone', e.target.checked)}
+          className="mt-0"
+        />
+        <Flag size={13} className={state.isMilestone ? 'text-amber-700' : 'text-ink-tertiary'} />
+        <span className="flex-1">
+          <span className={classNames('font-medium', state.isMilestone ? 'text-amber-900' : 'text-ink-primary')}>
+            Tandai sebagai Milestone
+          </span>
+          <span className="block text-[10px] text-ink-tertiary">
+            Milestone akan dimunculkan sebagai marker di S-Curve dan timeline project.
+          </span>
+        </span>
+      </label>
+
       <div>
-        <span className="mb-1.5 block text-xs font-medium text-ink-secondary">Assignees</span>
+        <span className="mb-1.5 block text-xs font-medium text-ink-secondary">PIC (Penanggung Jawab Utama)</span>
         <div className="flex flex-wrap gap-1.5 mb-2">
           {state.assignees.map((a) => (
             <span key={a} className="pill">
@@ -250,6 +303,49 @@ export function TaskForm({ initial, onSubmit, onCancel, submitLabel = 'Simpan', 
                 update('assignees', [...state.assignees, assigneeInput.trim()])
               }
               setAssigneeInput('')
+            }
+          }}
+        />
+      </div>
+
+      <div>
+        <span className="mb-1.5 block text-xs font-medium text-ink-secondary">
+          Co-PIC (Pendukung Utama)
+        </span>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {state.coPics.map((a) => (
+            <span key={a} className="pill bg-violet-50 text-violet-700 border border-violet-200">
+              {a}
+              <button
+                type="button"
+                onClick={() => update('coPics', state.coPics.filter((x) => x !== a))}
+                className="ml-1 text-ink-tertiary hover:text-accent-danger"
+              >
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+          {state.coPics.length === 0 && (
+            <span className="text-[11px] text-ink-tertiary italic">Belum ada Co-PIC</span>
+          )}
+        </div>
+        <input
+          className="input-base"
+          placeholder="Ketik nama Co-PIC lalu Enter (opsional)"
+          value={coPicInput}
+          onChange={(e) => setCoPicInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && coPicInput.trim()) {
+              e.preventDefault()
+              const trimmed = coPicInput.trim()
+              if (state.assignees.includes(trimmed)) {
+                toast.error(`"${trimmed}" sudah jadi PIC utama`)
+                return
+              }
+              if (!state.coPics.includes(trimmed)) {
+                update('coPics', [...state.coPics, trimmed])
+              }
+              setCoPicInput('')
             }
           }}
         />

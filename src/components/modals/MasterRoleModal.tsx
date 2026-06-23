@@ -59,6 +59,9 @@ const PERMISSION_GROUPS: Array<{ title: string; items: Array<{ key: keyof RolePe
     items: [
       { key: 'canApproveHandoff', label: 'Menjadi approver handoff' },
       { key: 'canApproveSegmentChange', label: 'Setujui perubahan kolom kanban' },
+      { key: 'canApproveAsKadiv', label: 'Menjadi Kadiv Approver (project, divisi sendiri)' },
+      { key: 'canApproveAsOSM', label: 'Menjadi OSM Approver (project)' },
+      { key: 'canApproveAsDMO', label: 'Menjadi DMO Approver (project)' },
     ],
   },
   {
@@ -189,6 +192,9 @@ function NewRoleButton({ onCreated }: { onCreated: (id: string) => void }) {
             canCloseProject: false,
             canRequestSegmentChange: false,
             canApproveSegmentChange: false,
+            canApproveAsOSM: false,
+            canApproveAsDMO: false,
+            canApproveAsKadiv: false,
           },
         })
         onCreated(created.id)

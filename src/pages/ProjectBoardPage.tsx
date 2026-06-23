@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
-import { Briefcase, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Briefcase, CheckCircle2, ChevronDown, ChevronRight, Inbox, List } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useProjectStore } from '../store/useProjectStore'
 import { useTaskStore } from '../store/useTaskStore'
@@ -29,36 +29,17 @@ export function ProjectBoardPage() {
   const openModal = useUIStore((s) => s.openModal)
   const { user, can } = usePermissions()
 
-  // Visible di Board Utama = project yang punya ≥1 task masuk kolom Selesai
-  // (project di-render di kolom L0 sesuai project.currentStage)
-  const visibleProjects = useMemo(() => {
-    const isTaskDone = (task: typeof tasks[number]) => {
-      const team = teams.find((t) => t.id === task.teamId)
-      const col = team?.kanbanConfig?.find((c) => c.key === task.status)
-      return col?.isDone === true || task.status === 'done'
-    }
-    const filtered = projects.filter((p) => {
-      if (p.status === 'closed' || p.status === 'cancelled') return false
-      return tasks.some((t) => t.projectId === p.id && isTaskDone(t))
-    })
-    // DEBUG: bantu trace kenapa project tidak muncul
-    console.log('[BoardUtama Filter]', {
-      totalProjects: projects.length,
-      totalTasks: tasks.length,
-      doneTasks: tasks.filter(isTaskDone).map((t) => ({ id: t.id, title: t.title, status: t.status, stage: t.stage, projectId: t.projectId, teamId: t.teamId })),
-      visibleCount: filtered.length,
-      hidden: projects.filter((p) => !filtered.includes(p)).map((p) => ({
-        id: p.id,
-        code: p.code,
-        name: p.name,
-        currentStage: p.currentStage,
-        status: p.status,
-        hasAnyTask: tasks.some((t) => t.projectId === p.id),
-        hasDoneTask: tasks.some((t) => t.projectId === p.id && isTaskDone(t)),
-      })),
-    })
-    return filtered
-  }, [projects, tasks, teams])
+  // Board Utama hanya menampilkan project yang sudah AKTIF (lulus approval flow).
+  // Project dengan status pending_approval / rejected / closed / cancelled disembunyikan.
+  const visibleProjects = useMemo(
+    () => projects.filter((p) => p.status === 'active' || p.status === 'on_hold' || p.status === 'completed'),
+    [projects],
+  )
+
+  const pendingApprovalCount = useMemo(
+    () => projects.filter((p) => p.status === 'pending_approval').length,
+    [projects],
+  )
 
   const grouped = useMemo(() => {
     const map: Record<BusinessStage, Project[]> = {
@@ -118,17 +99,43 @@ export function ProjectBoardPage() {
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="absolute inset-0 overflow-y-auto overflow-x-hidden">
-        <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-5 pb-2">
+        <div className="flex items-start justify-between gap-3 px-3 sm:px-5 pt-3 sm:pt-5 pb-2">
           <div>
             <h2 className="text-base sm:text-lg font-semibold text-ink-primary flex items-center gap-2">
               <Briefcase size={16} className="text-pertamina-red" />
               Board Utama — L0 Business Process
             </h2>
             <p className="text-[11px] text-ink-tertiary mt-0.5">
-              Posisi project PGNCOM dalam pipeline Lead to Close. Drag card untuk advance stage.
+              Hanya project AKTIF (lulus approval) yang tampil di sini. Drag card untuk advance stage.
             </p>
           </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => openModal({ type: 'all-projects' })}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-white px-2.5 py-1.5 text-[12px] font-medium text-ink-secondary hover:text-pertamina-red hover:border-pertamina-red/40 transition"
+              title="Lihat semua project lintas status"
+            >
+              <List size={13} />
+              Semua Project
+            </button>
+            {/* Tombol Buat Project DIPINDAH ke Board Divisi (stage Lead to Active). */}
+          </div>
         </div>
+
+        {pendingApprovalCount > 0 && (
+          <div className="mx-3 sm:mx-5 mb-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 flex items-center gap-2">
+            <Inbox size={14} className="text-amber-700 shrink-0" />
+            <div className="flex-1 text-[11px] text-amber-800">
+              <strong>{pendingApprovalCount} project</strong> menunggu approval — tidak akan tampil di board sampai semua step disetujui.
+            </div>
+            <button
+              onClick={() => openModal({ type: 'approval-queue' })}
+              className="rounded-md bg-amber-200 px-2 py-1 text-[11px] font-medium text-amber-900 hover:bg-amber-300 transition whitespace-nowrap"
+            >
+              Buka Antrian Approval
+            </button>
+          </div>
+        )}
 
         {hasUnowned && (
           <div className="mx-3 sm:mx-5 mb-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 flex items-start gap-2">

@@ -25,8 +25,25 @@ export function KanbanColumn({ column, tasks }: KanbanColumnProps) {
   const projectId = useUIStore((s) => s.filters.projectId)
   const stageCtx = useUIStore((s) => s.boardStageContext)
   const { can } = usePermissions()
-  const createPerm = can('task.create')
+  // Mode: di Lead-to-Active stage + kolom Backlog, tombol "+" memunculkan AddProjectModal.
+  // Di stage lain atau kolom lain, tombol "+" untuk Tambah Tugas.
+  const isProjectCreateMode = stageCtx === 'lead_to_active' && (column.key === 'backlog' || column.isSystem)
+  const createPerm = isProjectCreateMode ? can('project.create') : can('task.create')
   const hex = column.color
+  const handleAdd = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (isProjectCreateMode) {
+      openModal({ type: 'add-project', defaultStage: stageCtx ?? undefined })
+    } else {
+      openModal({
+        type: 'add-task',
+        defaultStatus: column.key,
+        defaultProjectId: projectId ?? undefined,
+        defaultStage: stageCtx ?? undefined,
+      })
+    }
+  }
+  const addLabel = isProjectCreateMode ? 'Tambah Proyek' : 'Tambah Tugas'
 
   return (
     <div className="flex flex-col rounded-xl border border-border-subtle bg-bg-column overflow-hidden shadow-card transition">
@@ -59,26 +76,24 @@ export function KanbanColumn({ column, tasks }: KanbanColumnProps) {
         <span className="ml-auto flex items-center gap-1">
           {createPerm.allowed ? (
             <span
-              onClick={(e) => {
-                e.stopPropagation()
-                openModal({
-                  type: 'add-task',
-                  defaultStatus: column.key,
-                  defaultProjectId: projectId ?? undefined,
-                  defaultStage: stageCtx ?? undefined,
-                })
-              }}
-              className="rounded-md p-1 text-ink-tertiary hover:bg-black/[0.06] hover:text-pertamina-red transition cursor-pointer"
-              title="Tambah Proyek baru"
+              onClick={handleAdd}
+              className={classNames(
+                'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium transition cursor-pointer',
+                isProjectCreateMode
+                  ? 'bg-pertamina-red text-white hover:bg-pertamina-red/90 shadow-glow'
+                  : 'text-ink-tertiary hover:bg-black/[0.06] hover:text-pertamina-red',
+              )}
+              title={`${addLabel} baru`}
             >
-              <Plus size={13} />
+              <Plus size={isProjectCreateMode ? 12 : 13} />
+              {isProjectCreateMode && <span>{addLabel}</span>}
             </span>
           ) : (
             <Tooltip content={createPerm.reason ?? ''}>
               <span
                 onClick={(e) => {
                   e.stopPropagation()
-                  toast.error(createPerm.reason ?? 'Tidak diizinkan membuat proyek')
+                  toast.error(createPerm.reason ?? `Tidak diizinkan ${addLabel.toLowerCase()}`)
                 }}
                 className="rounded-md p-1 text-ink-tertiary opacity-40 cursor-not-allowed"
               >
@@ -139,25 +154,23 @@ export function KanbanColumn({ column, tasks }: KanbanColumnProps) {
                   {tasks.length === 0 && !snapshot.isDraggingOver && (
                     createPerm.allowed ? (
                       <button
-                        onClick={() =>
-                          openModal({
-                            type: 'add-task',
-                            defaultStatus: column.key,
-                            defaultProjectId: projectId ?? undefined,
-                            defaultStage: stageCtx ?? undefined,
-                          })
-                        }
-                        className="flex h-12 w-full items-center justify-center rounded-lg border border-dashed border-border bg-white text-[11px] text-ink-tertiary hover:text-pertamina-red hover:border-pertamina-red/40 hover:bg-pertamina-red-50 transition"
+                        onClick={handleAdd}
+                        className={classNames(
+                          'flex h-12 w-full items-center justify-center rounded-lg border border-dashed text-[11px] transition',
+                          isProjectCreateMode
+                            ? 'border-pertamina-red/40 bg-pertamina-red-50/40 text-pertamina-red font-medium hover:bg-pertamina-red-50'
+                            : 'border-border bg-white text-ink-tertiary hover:text-pertamina-red hover:border-pertamina-red/40 hover:bg-pertamina-red-50',
+                        )}
                       >
-                        <Plus size={14} className="mr-1" /> Tambah Proyek
+                        <Plus size={14} className="mr-1" /> {addLabel}
                       </button>
                     ) : (
                       <div
-                        onClick={() => toast.error(createPerm.reason ?? 'Tidak diizinkan membuat proyek')}
+                        onClick={() => toast.error(createPerm.reason ?? `Tidak diizinkan ${addLabel.toLowerCase()}`)}
                         className="flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-white text-[11px] text-ink-tertiary cursor-help px-3 text-center"
                         title={createPerm.reason ?? ''}
                       >
-                        <span>Belum ada tugas</span>
+                        <span>{isProjectCreateMode ? 'Belum ada proyek di Backlog' : 'Belum ada tugas'}</span>
                         <span className="text-[10px] text-pertamina-red opacity-70">⚠ Tidak ada izin tambah</span>
                       </div>
                     )

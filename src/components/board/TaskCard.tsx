@@ -1,6 +1,6 @@
 import { memo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Pencil, ArrowRightLeft, Trash2, Paperclip, MessageSquare, History, Clock, ChevronRight } from 'lucide-react'
+import { Pencil, ArrowRightLeft, Trash2, Paperclip, MessageSquare, History, Clock, ChevronRight, Flag, ShieldCheck } from 'lucide-react'
 import type { Task } from '../../types'
 import { useTeamStore } from '../../store/useTeamStore'
 import { useTaskStore } from '../../store/useTaskStore'
@@ -39,6 +39,9 @@ export const TaskCard = memo(function TaskCard({ task, isDragging }: TaskCardPro
   const completedSubs = task.subTasks.filter((s) => s.done).length
   const totalSubs = task.subTasks.length
   const hasHandoff = task.handoffHistory.length > 0
+  const totalAttachments = task.attachments?.length ?? task.attachmentCount ?? 0
+  const evidenceCount = (task.attachments ?? []).filter((a) => a.category === 'evidence').length
+  const needsEvidence = !isInDoneColumn && evidenceCount === 0 && totalAttachments > 0
 
   return (
     <motion.div
@@ -53,6 +56,9 @@ export const TaskCard = memo(function TaskCard({ task, isDragging }: TaskCardPro
     >
       {/* Baris 1: title · priority · team badge · chips · story points */}
       <div className="flex items-center gap-2 min-w-0">
+        {task.isMilestone && (
+          <Flag size={11} className="text-amber-600 shrink-0" />
+        )}
         <h3 className="text-[13px] font-medium text-ink-primary truncate flex-1 min-w-0">{task.title}</h3>
         {team && <TeamBadge name={team.name} color={team.color} acronym={team.acronym} />}
         {pendingReq && (
@@ -133,9 +139,26 @@ export const TaskCard = memo(function TaskCard({ task, isDragging }: TaskCardPro
             {dl.text}
           </span>
         )}
-        {task.attachmentCount > 0 && (
-          <span className="inline-flex items-center gap-0.5 shrink-0"><Paperclip size={9} />{task.attachmentCount}</span>
+        {totalAttachments > 0 && (
+          <span className="inline-flex items-center gap-0.5 shrink-0" title={`${totalAttachments} lampiran`}>
+            <Paperclip size={9} />{totalAttachments}
+          </span>
         )}
+        {evidenceCount > 0 ? (
+          <span
+            className="inline-flex items-center gap-0.5 shrink-0 text-emerald-700"
+            title={`${evidenceCount} evidence — siap selesaikan`}
+          >
+            <ShieldCheck size={9} />{evidenceCount}
+          </span>
+        ) : needsEvidence ? (
+          <span
+            className="inline-flex items-center gap-0.5 shrink-0 text-pertamina-red"
+            title="Belum ada evidence — wajib sebelum Selesai"
+          >
+            <ShieldCheck size={9} />0
+          </span>
+        ) : null}
         {task.commentCount > 0 && (
           <span className="inline-flex items-center gap-0.5 shrink-0"><MessageSquare size={9} />{task.commentCount}</span>
         )}

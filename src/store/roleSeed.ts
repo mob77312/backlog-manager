@@ -27,6 +27,9 @@ const allow = (): RolePermissions => ({
   canCloseProject: true,
   canRequestSegmentChange: true,
   canApproveSegmentChange: true,
+  canApproveAsOSM: true,
+  canApproveAsDMO: true,
+  canApproveAsKadiv: true,
 })
 
 const none = (): RolePermissions => ({
@@ -56,6 +59,9 @@ const none = (): RolePermissions => ({
   canCloseProject: false,
   canRequestSegmentChange: false,
   canApproveSegmentChange: false,
+  canApproveAsOSM: false,
+  canApproveAsDMO: false,
+  canApproveAsKadiv: false,
 })
 
 export const SEED_ROLES: MasterRole[] = [
@@ -97,6 +103,9 @@ export const SEED_ROLES: MasterRole[] = [
       canEditProjectWeights: true,
       canRequestSegmentChange: true,
       canApproveSegmentChange: true,
+      canApproveAsOSM: true,
+      canApproveAsDMO: true,
+      canApproveAsKadiv: true,
     },
   },
   {

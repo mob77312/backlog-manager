@@ -12,12 +12,18 @@ import {
   Calendar,
   Check,
   CheckCircle2,
+  Clock,
+  Flag,
   History,
+  Package,
   Plus,
   Tag,
   Trash2,
+  UserPlus,
   Users,
+  X,
 } from 'lucide-react'
+import { AttachmentManager } from '../task/AttachmentManager'
 import { FIBONACCI_POINTS, PRIORITY_LABELS, STAGE_LABELS, STATUS_LABELS } from '../../utils/colors'
 import { useProjectStore } from '../../store/useProjectStore'
 import { formatDateTime, relativeTime, classNames } from '../../utils/helpers'
@@ -119,6 +125,11 @@ export function TaskDetailModal({ open, onClose, taskId }: Props) {
             <div className="mt-2 flex flex-wrap gap-1.5">
               <PriorityBadge priority={task.priority} />
               {team && <TeamBadge name={team.name} color={team.color} acronym={team.acronym} />}
+              {task.isMilestone && (
+                <span className="pill border border-amber-300 bg-amber-50 text-amber-800">
+                  <Flag size={10} className="mr-0.5" /> Milestone
+                </span>
+              )}
               <span className="pill">
                 <span className="font-mono">#{task.id.slice(-6)}</span>
               </span>
@@ -159,6 +170,25 @@ export function TaskDetailModal({ open, onClose, taskId }: Props) {
                 )}
               </p>
             )}
+          </section>
+
+          {/* Deliverable */}
+          <section>
+            <h3 className="text-[10px] uppercase tracking-widest text-ink-tertiary mb-1.5 flex items-center gap-1.5">
+              <Package size={11} /> Deliverable
+            </h3>
+            <textarea
+              className="input-base min-h-[60px] text-sm"
+              disabled={!canEdit}
+              placeholder={canEdit ? 'Output konkret yang diharapkan dari tugas ini...' : 'Belum ada deliverable'}
+              value={task.deliverable}
+              onChange={(e) => updateTask(task.id, { deliverable: e.target.value })}
+            />
+          </section>
+
+          {/* Attachments */}
+          <section>
+            <AttachmentManager task={task} canEdit={canEdit} />
           </section>
 
           {/* Subtasks */}
@@ -295,7 +325,17 @@ export function TaskDetailModal({ open, onClose, taskId }: Props) {
             label="Status"
             value={task.status}
             disabled={!canMove}
-            onChange={(e) => moveTask(task.id, e.target.value as Status)}
+            onChange={(e) => {
+              const newStatus = e.target.value as Status
+              const targetCol = team?.kanbanConfig?.find((c) => c.key === newStatus)
+              const targetIsDone = targetCol?.isDone === true || newStatus === 'done'
+              const hasEvidence = (task.attachments ?? []).some((a) => a.category === 'evidence')
+              if (targetIsDone && !hasEvidence) {
+                toast.error('Tambahkan minimal 1 lampiran kategori Evidence sebelum menandai Selesai')
+                return
+              }
+              moveTask(task.id, newStatus)
+            }}
             options={STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] }))}
           />
           <Select
@@ -328,11 +368,57 @@ export function TaskDetailModal({ open, onClose, taskId }: Props) {
           />
           <div>
             <span className="mb-1.5 block text-xs font-medium text-ink-secondary flex items-center gap-1.5">
-              <Users size={11} /> Assignees
+              <Users size={11} /> PIC (Penanggung Jawab)
             </span>
             <div className="flex items-center gap-2">
               <AvatarStack names={task.assignees} max={4} />
               {task.assignees.length === 0 && <span className="text-[11px] text-ink-tertiary">Belum ada</span>}
+            </div>
+          </div>
+          <CoPicEditor task={task} canEdit={canEdit} onUpdate={(coPics) => updateTask(task.id, { coPics })} />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <span className="mb-1.5 block text-xs font-medium text-ink-secondary flex items-center gap-1.5">
+                <Clock size={11} /> Estimasi (hari)
+              </span>
+              <input
+                type="number"
+                min={0}
+                className="input-base"
+                disabled={!canEdit}
+                value={task.estimatedDurationDays ?? ''}
+                placeholder="—"
+                onChange={(e) =>
+                  updateTask(task.id, {
+                    estimatedDurationDays: e.target.value
+                      ? Math.max(0, parseInt(e.target.value, 10))
+                      : null,
+                  })
+                }
+              />
+            </div>
+            <div>
+              <span className="mb-1.5 block text-xs font-medium text-ink-secondary flex items-center gap-1.5">
+                <Flag size={11} /> Milestone
+              </span>
+              <label
+                className={classNames(
+                  'flex h-[34px] cursor-pointer items-center gap-1.5 rounded-md border px-2 text-[12px] transition',
+                  task.isMilestone
+                    ? 'border-amber-400 bg-amber-50 text-amber-900'
+                    : 'border-border bg-white text-ink-secondary hover:bg-black/[0.03]',
+                  !canEdit && 'cursor-not-allowed opacity-60',
+                )}
+              >
+                <input
+                  type="checkbox"
+                  disabled={!canEdit}
+                  checked={task.isMilestone}
+                  onChange={(e) => updateTask(task.id, { isMilestone: e.target.checked })}
+                  className="m-0"
+                />
+                {task.isMilestone ? 'Ya' : 'Tidak'}
+              </label>
             </div>
           </div>
           <div>
@@ -450,7 +536,11 @@ export function TaskDetailModal({ open, onClose, taskId }: Props) {
                 <button
                   className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-50 border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition shadow-glow-success"
                   onClick={() => {
-                    markDone(task.id)
+                    const result = markDone(task.id)
+                    if (!result.ok) {
+                      toast.error(result.error ?? 'Gagal menandai selesai')
+                      return
+                    }
                     toast.success('Tugas ditandai selesai')
                   }}
                 >
@@ -498,6 +588,63 @@ export function TaskDetailModal({ open, onClose, taskId }: Props) {
         </div>
       </div>
     </Modal>
+  )
+}
+
+function CoPicEditor({
+  task,
+  canEdit,
+  onUpdate,
+}: {
+  task: import('../../types').Task
+  canEdit: boolean
+  onUpdate: (coPics: string[]) => void
+}) {
+  const [input, setInput] = useState('')
+  return (
+    <div>
+      <span className="mb-1.5 block text-xs font-medium text-ink-secondary flex items-center gap-1.5">
+        <UserPlus size={11} /> Co-PIC
+      </span>
+      <div className="flex flex-wrap gap-1.5 mb-1.5">
+        {task.coPics.length === 0 && (
+          <span className="text-[11px] text-ink-tertiary italic">Belum ada Co-PIC</span>
+        )}
+        {task.coPics.map((c) => (
+          <span key={c} className="pill border border-violet-200 bg-violet-50 text-violet-700">
+            {c}
+            {canEdit && (
+              <button
+                onClick={() => onUpdate(task.coPics.filter((x) => x !== c))}
+                className="ml-1 text-violet-400 hover:text-pertamina-red"
+              >
+                <X size={10} />
+              </button>
+            )}
+          </span>
+        ))}
+      </div>
+      {canEdit && (
+        <input
+          className="input-base"
+          placeholder="Ketik nama Co-PIC lalu Enter"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && input.trim()) {
+              e.preventDefault()
+              const trimmed = input.trim()
+              if (task.assignees.includes(trimmed)) {
+                toast.error(`"${trimmed}" sudah jadi PIC utama`)
+                return
+              }
+              if (!task.coPics.includes(trimmed)) onUpdate([...task.coPics, trimmed])
+              setInput('')
+            }
+          }}
+        />
+      )}
+    </div>
   )
 }
 

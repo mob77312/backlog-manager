@@ -20,6 +20,10 @@ import { RequestDeleteTaskModal } from './RequestDeleteTaskModal'
 import { DeleteRequestDetailModal } from './DeleteRequestDetailModal'
 import { AddProjectModal } from './AddProjectModal'
 import { ProjectDetailModal } from './ProjectDetailModal'
+import { ProjectApprovalModal } from './ProjectApprovalModal'
+import { AllProjectsModal } from './AllProjectsModal'
+import { ApprovalTemplateModal } from './ApprovalTemplateModal'
+import { ProjectCompletionModal } from './ProjectCompletionModal'
 import { KanbanConfigModal } from './KanbanConfigModal'
 import { SegmentRequestModal } from './SegmentRequestModal'
 import { SegmentRequestDetailModal } from './SegmentRequestDetailModal'
@@ -85,6 +89,14 @@ export function ModalsRoot() {
       return <AddProjectModal open onClose={close} defaultStage={modal.defaultStage} />
     case 'project-detail':
       return <ProjectDetailModal open onClose={close} projectId={modal.projectId} />
+    case 'project-approval':
+      return <ProjectApprovalModal open onClose={close} projectId={modal.projectId} />
+    case 'all-projects':
+      return <AllProjectsModal open onClose={close} />
+    case 'approval-templates':
+      return <ApprovalTemplateModal open onClose={close} />
+    case 'project-completion':
+      return <ProjectCompletionModal open onClose={close} projectId={modal.projectId} />
     case 'kanban-config':
       return <KanbanConfigModal open onClose={close} teamId={modal.teamId} />
     case 'segment-request':

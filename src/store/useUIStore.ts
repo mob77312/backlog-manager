@@ -25,6 +25,10 @@ export type ModalType =
   | { type: 'add-project'; defaultStage?: import('../types').BusinessStage }
   | { type: 'project-detail'; projectId: string }
   | { type: 'project-advance'; projectId: string }
+  | { type: 'project-approval'; projectId: string }
+  | { type: 'all-projects' }
+  | { type: 'approval-templates' }
+  | { type: 'project-completion'; projectId: string }
   | { type: 'kanban-config'; teamId: string }
   | { type: 'segment-request'; teamId: string; action: 'add' | 'remove'; columnId?: string }
   | { type: 'segment-request-detail'; requestId: string }
@@ -44,6 +48,10 @@ interface UIState {
   activityLogOpen: boolean
   toggleActivityLog: () => void
   setActivityLogOpen: (open: boolean) => void
+
+  notificationOpen: boolean
+  toggleNotification: () => void
+  setNotificationOpen: (open: boolean) => void
 
   filters: Filters
   setSearch: (q: string) => void
@@ -81,6 +89,10 @@ export const useUIStore = create<UIState>((set) => ({
   activityLogOpen: false,
   toggleActivityLog: () => set((s) => ({ activityLogOpen: !s.activityLogOpen })),
   setActivityLogOpen: (open) => set({ activityLogOpen: open }),
+
+  notificationOpen: false,
+  toggleNotification: () => set((s) => ({ notificationOpen: !s.notificationOpen })),
+  setNotificationOpen: (open) => set({ notificationOpen: open }),
 
   filters: { search: '', priorities: [], teamIds: [], statuses: [], projectId: null },
   setSearch: (q) => set((s) => ({ filters: { ...s.filters, search: q } })),

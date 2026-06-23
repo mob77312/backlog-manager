@@ -8,6 +8,7 @@ import { PRIORITY_LABELS, STATUS_LABELS } from '../../utils/colors'
 import { classNames } from '../../utils/helpers'
 import { usePermissions } from '../../hooks/usePermissions'
 import { useApprovalQueue } from '../../hooks/useApprovalQueue'
+import { useNotificationStore } from '../../store/useNotificationStore'
 import type { Priority, Status } from '../../types'
 
 const PRIORITIES: Priority[] = ['critical', 'high', 'medium', 'low']
@@ -31,12 +32,14 @@ export function Header() {
   const setSidebarTeamFilter = useUIStore((s) => s.setSidebarTeamFilter)
   const openModal = useUIStore((s) => s.openModal)
   const toggleActivityLog = useUIStore((s) => s.toggleActivityLog)
+  const toggleNotification = useUIStore((s) => s.toggleNotification)
   const setMobileSidebarOpen = useUIStore((s) => s.setMobileSidebarOpen)
   const searchToken = useUIStore((s) => s.searchFocusToken)
   const teams = useTeamStore((s) => s.teams)
   const inputRef = useRef<HTMLInputElement>(null)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
-  const { can } = usePermissions()
+  const { can, user } = usePermissions()
+  const unreadNotifs = useNotificationStore((s) => (user ? s.unreadCountFor(user.id) : 0))
   const createTaskPerm = can('task.create')
   const isProjectBoard = view === 'project-board'
   const isBoard = view === 'board'
@@ -120,13 +123,15 @@ export function Header() {
             </button>
           )}
           <button
-            onClick={() => openModal({ type: 'approval-queue' })}
+            onClick={toggleNotification}
             className="hidden sm:flex rounded-lg border border-border bg-white p-2 text-ink-secondary hover:text-pertamina-red hover:border-pertamina-red/40 hover:bg-pertamina-red-50 transition relative"
             title="Notifikasi"
           >
             <Bell size={14} />
-            {(approvalQueue.actionableCount + approvalQueue.myPendingCount) > 0 && (
-              <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-pertamina-red shadow-glow" />
+            {unreadNotifs > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 grid h-4 min-w-[16px] place-items-center rounded-full bg-pertamina-red px-1 text-[9px] font-bold text-white shadow-glow">
+                {unreadNotifs}
+              </span>
             )}
           </button>
           {/* Sembunyikan tombol create di Project Board — project dibuat lewat Board Divisi */}
@@ -137,13 +142,13 @@ export function Header() {
                 className="px-2 sm:px-4"
               >
                 <Plus size={14} />
-                <span className="hidden sm:inline">Tambah Proyek</span>
+                <span className="hidden sm:inline">Tambah Tugas</span>
               </Button>
             ) : (
               <Tooltip content={createPerm.reason ?? ''}>
                 <Button disabled className="opacity-60 cursor-not-allowed px-2 sm:px-4">
                   <Plus size={14} />
-                  <span className="hidden sm:inline">Tambah Proyek</span>
+                  <span className="hidden sm:inline">Tambah Tugas</span>
                 </Button>
               </Tooltip>
             )

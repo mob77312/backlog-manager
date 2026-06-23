@@ -60,11 +60,18 @@ export function KanbanBoard() {
     // Penting di multi-team mode — cegah task pindah ke kolom yang tidak dikenal divisi-nya
     const taskTeam = teams.find((t) => t.id === task.teamId)
     const validCols = taskTeam?.kanbanConfig ?? []
-    const isValidDestination = validCols.some((c) => c.key === destination.droppableId)
-    if (!isValidDestination) {
+    const destCol = validCols.find((c) => c.key === destination.droppableId)
+    if (!destCol) {
       toast.error(
         `Kolom "${destination.droppableId}" tidak ada di kanban divisi ${taskTeam?.acronym ?? task.teamId}. Atur via "Atur Kolom" dulu.`,
       )
+      return
+    }
+    // P2: Evidence gate — block drag ke kolom Done jika belum ada Evidence attachment.
+    const movingToDone = destCol.isDone === true || destination.droppableId === 'done'
+    const hasEvidence = (task.attachments ?? []).some((a) => a.category === 'evidence')
+    if (movingToDone && !hasEvidence) {
+      toast.error('Tambahkan minimal 1 lampiran kategori Evidence sebelum memindahkan ke kolom Selesai')
       return
     }
     moveTask(draggableId, destination.droppableId)
@@ -182,10 +189,9 @@ export function KanbanBoard() {
           <div className="mb-3 rounded-lg border border-pertamina-red/30 bg-pertamina-red-50 px-3 py-2 flex items-start gap-2">
             <span className="text-pertamina-red">💡</span>
             <div className="flex-1 text-[11px] text-ink-secondary">
-              <strong className="text-pertamina-red">Belum ada item di stage {STAGE_LABELS[stageCtx]}.</strong>
+              <strong className="text-pertamina-red">Belum ada tugas di stage {STAGE_LABELS[stageCtx]}.</strong>
               <br />
-              Untuk menambah project baru: klik <strong>"+ Tambah Tugas"</strong> di kolom <strong>Backlog</strong> bawah ini.
-              Saat task pertama dibuat dengan stage {STAGE_LABELS[stageCtx]}, project otomatis terbentuk dan muncul di Board Utama.
+              Klik <strong>"+ Tambah Tugas"</strong> di kolom Backlog untuk membuat tugas. Project baru dibuat dari Board Utama via tombol <strong>"+ Buat Project"</strong>.
             </div>
           </div>
         )}

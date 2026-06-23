@@ -4,10 +4,12 @@ import { useApprovalQueue } from '../../hooks/useApprovalQueue'
 import { useTeamStore } from '../../store/useTeamStore'
 import { useUIStore } from '../../store/useUIStore'
 import { useSegmentRequestStore } from '../../store/useSegmentRequestStore'
+import { useProjectStore, getNextPendingStep } from '../../store/useProjectStore'
 import { usePermissions } from '../../hooks/usePermissions'
-import { ArrowRightLeft, CheckCircle2, Clock, Inbox, ShieldAlert, Trash2, XCircle, Settings2 } from 'lucide-react'
+import { ArrowRightLeft, CheckCircle2, Clock, FileCheck2, Inbox, ShieldAlert, Trash2, XCircle, Settings2 } from 'lucide-react'
 import { classNames, relativeTime } from '../../utils/helpers'
-import type { DeleteRequest, DeleteRequestStatus, HandoffRequest, HandoffRequestStatus, SegmentChangeRequest, SegmentChangeStatus } from '../../types'
+import { APPROVAL_STEP_LABELS, PRIORITY_HEX, PRIORITY_LABELS } from '../../utils/colors'
+import type { ApprovalStep, DeleteRequest, DeleteRequestStatus, HandoffRequest, HandoffRequestStatus, Project, SegmentChangeRequest, SegmentChangeStatus } from '../../types'
 
 interface Props {
   open: boolean
@@ -20,13 +22,46 @@ export function ApprovalQueueModal({ open, onClose }: Props) {
   const { originStage, targetStage, deleteStage, mine, myDeletes, actionableCount } = useApprovalQueue()
   const { user, can } = usePermissions()
   const segmentApprovePerm = can('segment.approve')
+  const osmPerm = can('project.approveAsOSM')
+  const dmoPerm = can('project.approveAsDMO')
+  const kadivPerm = can('project.approveAsKadiv')
   const allSegmentRequests = useSegmentRequestStore((s) => s.requests)
+  const allProjects = useProjectStore((s) => s.projects)
   const pendingSegments = allSegmentRequests.filter((r) => r.status === 'pending')
   const mySegments = user ? allSegmentRequests.filter((r) => r.requestedByUserId === user.id) : []
+
+  // P1: project approval queue — filter by step type + user permission
+  const pendingProjects = allProjects.filter((p) => p.status === 'pending_approval')
+  const kadivPendingProjects = pendingProjects.filter((p) => {
+    const next = getNextPendingStep(p.approvalFlow)
+    return next?.type === 'kadiv_approval'
+  })
+  const osmPendingProjects = pendingProjects.filter((p) => {
+    const next = getNextPendingStep(p.approvalFlow)
+    return next?.type === 'osm_approval'
+  })
+  const dmoPendingProjects = pendingProjects.filter((p) => {
+    const next = getNextPendingStep(p.approvalFlow)
+    return next?.type === 'dmo_approval'
+  })
+  const ownerPendingProjects = user
+    ? pendingProjects.filter((p) => {
+        const next = getNextPendingStep(p.approvalFlow)
+        const isOwnerStep = next?.type === 'kickoff_meeting' || next?.type === 'risk_assessment'
+        return isOwnerStep && (p.createdByUserId === user.id || can('project.edit').allowed)
+      })
+    : []
+  const myProjects = user ? allProjects.filter((p) => p.createdByUserId === user.id && p.status === 'pending_approval') : []
+
   const [tab, setTab] = useState<Tab>('actionable')
-  const mineCount = mine.length + myDeletes.length + mySegments.length
+  const mineCount = mine.length + myDeletes.length + mySegments.length + myProjects.length
+  const projectActionableCount =
+    (kadivPerm.allowed ? kadivPendingProjects.length : 0) +
+    (osmPerm.allowed ? osmPendingProjects.length : 0) +
+    (dmoPerm.allowed ? dmoPendingProjects.length : 0) +
+    ownerPendingProjects.length
   const totalActionable =
-    actionableCount + (segmentApprovePerm.allowed ? pendingSegments.length : 0)
+    actionableCount + (segmentApprovePerm.allowed ? pendingSegments.length : 0) + projectActionableCount
 
   return (
     <Modal
@@ -48,6 +83,42 @@ export function ApprovalQueueModal({ open, onClose }: Props) {
 
         {tab === 'actionable' ? (
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+            {ownerPendingProjects.length > 0 && (
+              <ProjectSection
+                title="Project: Tindakan Project Owner"
+                hint="Tandai Kickoff Meeting / Risk Assessment yang sudah dilakukan untuk project yang Anda buat."
+                icon={<FileCheck2 size={13} className="text-violet-700" />}
+                projects={ownerPendingProjects}
+                emptyText=""
+              />
+            )}
+            {kadivPerm.allowed && (
+              <ProjectSection
+                title="Project: Persetujuan Kadiv"
+                hint="Sebagai Kadiv, review project yang baru di-submit oleh divisi Anda sebelum eskalasi ke OSM/DMO."
+                icon={<FileCheck2 size={13} className="text-violet-700" />}
+                projects={kadivPendingProjects}
+                emptyText="Tidak ada project menunggu approval Kadiv."
+              />
+            )}
+            {osmPerm.allowed && (
+              <ProjectSection
+                title="Project: OSM Approval"
+                hint="Sebagai OSM Approver, tinjau project yang menunggu persetujuan Anda."
+                icon={<FileCheck2 size={13} className="text-emerald-700" />}
+                projects={osmPendingProjects}
+                emptyText="Tidak ada project menunggu OSM approval."
+              />
+            )}
+            {dmoPerm.allowed && (
+              <ProjectSection
+                title="Project: DMO Approval"
+                hint="Sebagai DMO Approver, tinjau project yang menunggu persetujuan akhir."
+                icon={<FileCheck2 size={13} className="text-blue-700" />}
+                projects={dmoPendingProjects}
+                emptyText="Tidak ada project menunggu DMO approval."
+              />
+            )}
             <Section
               title="Persetujuan Asal"
               hint="Sebagai Kadiv divisi asal, Anda perlu menyetujui sebelum diteruskan."
@@ -81,6 +152,20 @@ export function ApprovalQueueModal({ open, onClose }: Props) {
           </div>
         ) : (
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+            <div>
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-ink-tertiary">
+                Project Saya ({myProjects.length})
+              </div>
+              <div className="space-y-2">
+                {myProjects.length === 0 ? (
+                  <div className="rounded-md border border-dashed border-border-subtle px-4 py-6 text-center text-[12px] text-ink-tertiary">
+                    Belum ada project pending Anda buat.
+                  </div>
+                ) : (
+                  myProjects.map((p) => <ProjectRow key={p.id} project={p} />)
+                )}
+              </div>
+            </div>
             <div>
               <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-ink-tertiary">
                 Handoff ({mine.length})
@@ -407,4 +492,78 @@ function SegmentStatusChip({ status }: { status: SegmentChangeStatus }) {
   }
   const m = map[status]
   return <span className={classNames('chip border whitespace-nowrap', m.cls)}>{m.label}</span>
+}
+
+function ProjectSection({
+  title,
+  hint,
+  icon,
+  projects,
+  emptyText,
+}: {
+  title: string
+  hint: string
+  icon: React.ReactNode
+  projects: Project[]
+  emptyText: string
+}) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-2">
+        {icon}
+        <h4 className="text-[12px] font-semibold tracking-tight text-ink-primary">{title}</h4>
+        <span className="text-[10px] text-ink-tertiary">· {projects.length} item</span>
+      </div>
+      <div className="text-[11px] text-ink-tertiary mb-2">{hint}</div>
+      <div className="space-y-2">
+        {projects.length === 0 ? (
+          <div className="rounded-md border border-dashed border-border-subtle px-3 py-4 text-center text-[11px] text-ink-tertiary">
+            {emptyText}
+          </div>
+        ) : (
+          projects.map((p) => <ProjectRow key={p.id} project={p} />)
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ProjectRow({ project }: { project: Project }) {
+  const openModal = useUIStore((s) => s.openModal)
+  const nextStep: ApprovalStep | null = getNextPendingStep(project.approvalFlow)
+  return (
+    <button
+      onClick={() => openModal({ type: 'project-approval', projectId: project.id })}
+      className="w-full text-left rounded-lg border border-border-subtle bg-white px-3 py-2.5 hover:border-pertamina-red/40 hover:bg-pertamina-red-50/30 transition"
+    >
+      <div className="flex items-start gap-3">
+        <Clock size={14} className="mt-0.5 text-amber-700" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-[12px] text-ink-primary font-medium truncate">
+            <span className="font-mono text-[10px] text-ink-tertiary">{project.code}</span>
+            <span className="truncate">{project.name}</span>
+          </div>
+          <div className="mt-1 flex items-center gap-1.5 text-[11px]">
+            <span
+              className="inline-flex items-center rounded-full px-1.5 py-0 text-[9px] font-bold uppercase"
+              style={{ background: `${PRIORITY_HEX[project.priority]}18`, color: PRIORITY_HEX[project.priority] }}
+            >
+              {PRIORITY_LABELS[project.priority]}
+            </span>
+            <span className="text-ink-tertiary">·</span>
+            <span className="text-ink-secondary">
+              Step: {nextStep ? APPROVAL_STEP_LABELS[nextStep.type] : '—'}
+            </span>
+            <span className="text-ink-tertiary">· oleh {project.createdByName}</span>
+          </div>
+        </div>
+        <div className="text-right">
+          <span className="chip border whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200">
+            Menunggu Approval
+          </span>
+          <div className="mt-1 text-[10px] text-ink-tertiary">{relativeTime(project.createdAt)}</div>
+        </div>
+      </div>
+    </button>
+  )
 }

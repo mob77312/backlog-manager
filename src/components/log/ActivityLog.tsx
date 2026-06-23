@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowRightLeft, CheckCircle2, Download, Edit3, Inbox, LogIn, LogOut, Move, Plus, Shield, Trash2, UserMinus, UserPlus, X } from 'lucide-react'
+import { AlertTriangle, ArrowRightLeft, CheckCircle2, Download, Edit3, Flag, Inbox, LogIn, LogOut, Move, Paperclip, Plus, Shield, Trash2, UserMinus, UserPlus, X } from 'lucide-react'
 import { useUIStore } from '../../store/useUIStore'
 import { useLogStore } from '../../store/useLogStore'
 import { ACTIVITY_TYPE_META } from '../../utils/colors'
@@ -22,6 +22,9 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   'user-minus': <UserMinus size={12} />,
   shield: <Shield size={12} />,
   inbox: <Inbox size={12} />,
+  paperclip: <Paperclip size={12} />,
+  flag: <Flag size={12} />,
+  alert: <AlertTriangle size={12} />,
   x: <X size={12} />,
 }
 
@@ -55,6 +58,19 @@ const TYPE_LABELS: Record<ActivityType, string> = {
   segment_change_requested: 'Usul Ubah Kolom',
   segment_change_approved: 'Ubah Kolom Disetujui',
   segment_change_rejected: 'Ubah Kolom Ditolak',
+  project_submitted_for_approval: 'Project Submit Approval',
+  project_approval_step_approved: 'Approval Step Disetujui',
+  project_approval_step_rejected: 'Approval Step Ditolak',
+  project_activated: 'Project Aktif',
+  project_approval_rejected: 'Project Ditolak',
+  task_attachment_added: 'Lampiran Ditambah',
+  task_attachment_removed: 'Lampiran Dihapus',
+  task_attachment_version_added: 'Versi Lampiran Baru',
+  project_kickoff_recorded: 'Kickoff Tercatat',
+  project_risk_added: 'Risiko Ditambah',
+  project_risk_updated: 'Risiko Diperbarui',
+  project_risk_removed: 'Risiko Dihapus',
+  project_completion_recorded: 'Form Penyelesaian',
 }
 
 const TYPE_FILTERS: ActivityType[] = ['handoff_requested', 'handoff_approved_origin', 'handoff_confirmed_target', 'handoff_rejected_origin', 'handoff_rejected_target', 'delete_requested', 'delete_approved', 'delete_rejected', 'task_created', 'task_moved', 'task_done', 'handoff', 'task_edited', 'task_deleted', 'team_added', 'team_removed', 'user_invited', 'user_removed', 'user_role_changed']
